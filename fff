@@ -1,0 +1,136 @@
+import platform
+import psutil
+import subprocess
+import re
+import socket
+import screeninfo
+from screeninfo import get_monitors
+from tabulate import tabulate
+import hashlib
+import GPUtil
+
+print(f"Запускаем сканирование компьютера")
+
+# Получение IP-адреса пользователя
+def get_user_ip():
+    try:
+        # Создание UDP-сокета
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.connect(("8.8.8.8", 80))  # Подключение к удаленному хосту
+
+        # Получение IP-адреса пользователя
+        user_ip = sock.getsockname()[0]
+
+        return user_ip
+    except socket.error:
+        return None
+
+# Вывод IP-адреса пользователя
+ip_address = get_user_ip()
+if ip_address:
+    print(" IP Address:", ip_address)
+else:
+    print("Failed to retrieve IP address.")
+
+# Информация о системе
+print("Manufacturer:", platform.system())
+print("Model:", platform.machine())
+print("Name:", platform.node())
+print("NumberOfProcessors:", psutil.cpu_count())
+print("SystemType:", platform.architecture()[0])
+print("SystemFamily:", platform.system())
+
+# Системная информация
+system_info = platform.uname()
+print("System:", system_info.system)
+print("Node Name:", system_info.node)
+print("Release:", system_info.release)
+print("Version:", system_info.version)
+print("Machine:", system_info.machine)
+print("Processor:", system_info.processor)
+
+# Наименование пользователя
+user = platform.uname().node
+print("User:", user)
+
+# Информация о памяти
+memory_info = psutil.virtual_memory()
+print("Memory Info:")
+print("  Total:", memory_info.total)
+print("  Available:", memory_info.available)
+print("  Used:", memory_info.used)
+print("  Free:", memory_info.free)
+print("  Percentage:", memory_info.percent)
+
+# Информация видеоадаптера
+def gpu_info():
+    gpus = GPUtil.getGPUs()
+    gpus_list = []
+
+    for gpu in gpus:
+        gpu_id = gpu.id
+        gpu_name = gpu.name
+        gpu_load = f'{gpu.load * 100}%'
+        gpu_free_memory = f'{gpu.memoryFree}MB'
+        gpu_used_memory = f'{gpu.memoryUsed}MB'
+        gpu_total_memory = f'{gpu.memoryTotal}MB'
+        gpu_temp = f'{gpu.temperature}'
+
+        gpus_list.append((gpu_id, gpu_name, gpu_load, gpu_free_memory, gpu_used_memory, gpu_total_memory, gpu_temp))
+
+    return str(
+        tabulate(gpus_list, headers=('id', 'name', 'load', 'free memory', 'used memory', 'total memory', 'temperature'),
+                 tablefmt='pretty'))
+
+if __name__ == '__main__':
+    print(gpu_info())
+
+# Информация о жестком диске
+disk_info = psutil.disk_usage('/')
+print("Disk Info:")
+print("  Total:", disk_info.total)
+print("  Used:", disk_info.used)
+print("  Free:", disk_info.free)
+print("  Percentage:", disk_info.percent)
+
+# Информация о запущенных процессах
+process_info = psutil.process_iter()
+print("Running Processes:")
+for process in process_info:
+    print("Process ID:", process.pid)
+    print("  Name:", process.name())
+
+# Установленные программы
+installed_programs = subprocess.check_output(['dpkg', '-l']).decode('utf-8')
+programs_list = re.findall(r'^ii\s+(.+?)\s+', installed_programs, flags=re.MULTILINE)
+print("Installed Programs:")
+for program in programs_list:
+    print("  Name:", program)
+
+# Информация о интернете
+def get_tcpip_config():
+    interfaces = psutil.net_if_addrs()
+    for interface, addresses in interfaces.items():
+        print("Interface:", interface)
+        for address in addresses:
+            if address.family == socket.AF_INET:
+                print("    IPv4 Address:", address.address)
+                print("    Netmask:", address.netmask)
+                print("    Broadcast IP:", address.broadcast)
+            elif address.family == socket.AF_INET6:
+                print("    IPv6 Address:", address.address)
+                print("    Netmask:", address.netmask)
+
+get_tcpip_config()
+
+# Информация о мониторе
+for m in get_monitors():
+    print(str(m))
+
+# Выполнение команды для получения информации о BIOS
+output = subprocess.check_output('dmidecode -s system-serial-number', shell=True)
+print("Серийный номер BIOS:", output.decode().strip())
+
+# Серийный номер процессора
+output = subprocess.check_output('dmidecode -s processor-version', shell=True)
+print("Серийный номер процессора:", output.decode().strip())
